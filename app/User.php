@@ -38,7 +38,7 @@ class User extends Authenticatable
     ];
     
     /**
-     * このユーザが所収している投稿。（Micropostモデルとの関係を定義）
+     * このユーザが所有している投稿。（Micropostモデルとの関係を定義）
      */
     public function microposts()
     {
@@ -62,11 +62,19 @@ class User extends Authenticatable
     }
     
     /**
+     * このユーザがお気に入りしている投稿。（Micropostモデルとの関係を定義
+     */
+    public function favorites()
+    {
+        return $this->belongsToMany(Micropost::class, 'favorites', 'user_id', 'micropost_id')->withTimestamps();
+    }
+    
+    /**
      * このユーザに関するモデルの件数をロードする。
      */
     public function loadRelationshipCounts()
     {
-        $this->loadCount(['microposts', 'followings', 'followers']);
+        $this->loadCount(['microposts', 'followings', 'followers', 'favorites']);
     }
     
     /**
@@ -138,5 +146,56 @@ class User extends Authenticatable
         $userIds[] = $this->id;
         // それらのユーザが所有する投稿に絞り込む
         return Micropost::whereIn('user_id', $userIds);
+    }
+    
+    /**
+     * 指定された $micropostId の投稿をこのユーザがお気に入り中であるか調べる。お気に入り中ならtrueを返す。
+     */
+    public function is_favorite($micropostId)
+    {
+        // お気に入りの中に $micropostIdのものが存在するか
+        return $this->favorites()->where('micropost_id', $micropostId)->exists();
+    }
+    
+    /**
+     * $micropostIdで指定された投稿をお気に入りにする。
+     * 
+     * @param  int  $micropostId
+     * @return bool
+     */
+    public function favorite($micropostId)
+    {
+        // すでにお気に入りにしているか確認
+        $exist = $this->is_favorite($micropostId);
+        
+        if ($exist) {
+            // すでにお気に入りなら何もしない
+            return false;
+        } else {
+            // お気に入りにしていないなら登録する
+            $this->favorites()->attach($micropostId);
+            return true;
+        }
+    }
+    
+    /**
+     * $micropostIdで指定された投稿をお気に入りから外す。
+     * 
+     * @param  int  $micropostId
+     * @return bool
+     */
+    public function unfavorite($micropostId)
+    {
+        // すでにお気に入りにしているか確認
+        $exist = $this->is_favorite($micropostId);
+        
+        if ($exist) {
+            // すでにお気に入りなら外す
+            $this->favorites()->detach($micropostId);
+            return true;
+        } else {
+            // お気に入りにしていないなら何もしない
+            return false;
+        }
     }
 }
